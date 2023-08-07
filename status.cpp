@@ -6,6 +6,7 @@
  * $Id$
  */
 
+#include <chrono>
 #include <vdr/channels.h>
 #include "status.h"
 #include "ait.h"
@@ -61,6 +62,7 @@ inline const char* toChannelJson(const cChannel* channel) {
 }
 
 
+bool runVolumeTrigger = false;
 cHbbtvDeviceStatus::cHbbtvDeviceStatus() {
    device = nullptr;
    aitFilter = nullptr;
@@ -68,6 +70,10 @@ cHbbtvDeviceStatus::cHbbtvDeviceStatus() {
 }
 
 cHbbtvDeviceStatus::~cHbbtvDeviceStatus() {
+   if (volumeTriggerThread) {
+      runVolumeTrigger = false;
+      volumeTriggerThread->join();
+   }
 }
 
 void cHbbtvDeviceStatus::ChannelSwitch(const cDevice * vdrDevice, int channelNumber, bool LiveView) {
@@ -105,7 +111,39 @@ void cHbbtvDeviceStatus::ChannelSwitch(const cDevice * vdrDevice, int channelNum
    }
 }
 
+void triggerVolumeThread(int volume) {
+   int counter = 0;
+   int waitTime = 400;
+
+   // Periodically update the volume bar
+   while (runVolumeTrigger) {
+      counter++;
+      if ((4 * 1000) - (counter * waitTime) <= 0) {
+          runVolumeTrigger = false;
+       } else {
+         WebOSDPage *page = WebOSDPage::Get();
+         if (page)
+            page->DrawVolume(volume);
+         std::this_thread::sleep_for(std::chrono::milliseconds(waitTime));
+      }
+   }
+
+   // force deleting the volume bar on exit
+   WebOSDPage *page = WebOSDPage::Get();
+   if (page)
+     page->DrawVolume(volume, true);
+}
+
 void cHbbtvDeviceStatus::SetVolume(int Volume, bool Absolute) {
     // instead using the parameter (relative volume change), use the absolute volume of the Device
-    browserClient->SetVolume(cDevice::CurrentVolume(), MAXVOLUME);
+//    browserClient->SetVolume(cDevice::CurrentVolume(), MAXVOLUME);
+   // First, stop a running thread if we have one
+   if (volumeTriggerThread) {
+      runVolumeTrigger = false;
+      volumeTriggerThread->join();
+   }
+   // second, start the new one
+   volume = Absolute ? Volume : volume + Volume;
+   runVolumeTrigger = true;
+   volumeTriggerThread = new std::thread(triggerVolumeThread, volume);
 }

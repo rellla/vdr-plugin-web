@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <thread>
 #include <vdr/status.h>
 #include "ait.h"
 
@@ -17,14 +18,17 @@ private:
    cDevice *device;
    cAitFilter *aitFilter;
    int sid;
+   int volume = 0;
+   std::thread* volumeTriggerThread = nullptr;
 protected:
    void ChannelSwitch(const cDevice *device, int channelNumber, bool LiveView) override;
-   void SetVolume(int Volume, bool Absolute) override;
+   virtual void SetVolume(int Volume, bool Absolute);
 
 public:
    cHbbtvDeviceStatus();
    ~cHbbtvDeviceStatus() override;
    int Sid() const { return sid; }
+   int GetVolume() { return volume; }
 };
 
-extern cHbbtvDeviceStatus *HbbtvDeviceStatus;
+extern cHbbtvDeviceStatus *hbbtvDeviceStatus;

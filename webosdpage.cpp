@@ -117,6 +117,8 @@ WebOSDPage::WebOSDPage(bool useOutputDeviceScale, OSD_MODE osdMode)
     pixmap = nullptr;
     disp_height = 1920;
     disp_width = 1080;
+    lastVolume = hbbtvDeviceStatus->GetVolume();
+    lastVolumeTime = time(NULL);
 
     currentMode = osdMode;
 
@@ -131,6 +133,11 @@ WebOSDPage::~WebOSDPage() {
 
     runTriggerActivity = false;
     activityTriggerThread->join();
+
+    if (volumeBox != nullptr) {
+        delete volumeBox;
+        volumeBox = nullptr;
+    }
 
     if (pixmap != nullptr) {
         osd->DestroyPixmap(pixmap);
@@ -411,6 +418,35 @@ eOSState WebOSDPage::ProcessKey(eKeys Key) {
 
 void WebOSDPage::Hide() {
     dsyslog("[vdrweb] WebOSDPage::Hide...");
+}
+
+void WebOSDPage::DrawVolume(int volume, bool forcedelete) {
+   // force delete volume box, flush and return
+   if (forcedelete) {
+      if (volumeBox)
+         DELETENULL(volumeBox);
+      if (osd)
+         osd->Flush();
+      return;
+   }
+
+   // volume changed, draw volume box
+   if (volume != lastVolume) {
+      if (!volumeBox)
+         volumeBox = new cWebOSDPageVolumeBox(osd, cRect(0, 0, disp_width, 20));
+      volumeBox->SetVolume(volume, MAXVOLUME, volume ? false : true);
+      lastVolume = volume;
+      lastVolumeTime = time(NULL);
+      if (osd)
+         osd->Flush();
+   } else {
+      // volume has not changed, delete volumebox after some time
+      if (volumeBox && (time(NULL) - lastVolumeTime > 2)) {
+         DELETENULL(volumeBox);
+         if (osd)
+            osd->Flush();
+      }
+   }
 }
 
 cOsdObject *WebOSDPage::GetInfo() {
