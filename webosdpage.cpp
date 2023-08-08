@@ -118,7 +118,6 @@ WebOSDPage::WebOSDPage(bool useOutputDeviceScale, OSD_MODE osdMode)
     disp_height = 1920;
     disp_width = 1080;
     lastVolume = hbbtvDeviceStatus->GetVolume();
-    lastVolumeTime = time(NULL);
 
     currentMode = osdMode;
 
@@ -133,11 +132,6 @@ WebOSDPage::~WebOSDPage() {
 
     runTriggerActivity = false;
     activityTriggerThread->join();
-
-    if (volumeBox != nullptr) {
-        delete volumeBox;
-        volumeBox = nullptr;
-    }
 
     if (pixmap != nullptr) {
         osd->DestroyPixmap(pixmap);
@@ -420,33 +414,36 @@ void WebOSDPage::Hide() {
     dsyslog("[vdrweb] WebOSDPage::Hide...");
 }
 
-void WebOSDPage::DrawVolume(int volume, bool forcedelete) {
-   // force delete volume box, flush and return
-   if (forcedelete) {
-      if (volumeBox)
-         DELETENULL(volumeBox);
-      if (osd)
-         osd->Flush();
-      return;
-   }
-
-   // volume changed, draw volume box
+void WebOSDPage::DrawVolume(int volume) {
    if (volume != lastVolume) {
-      if (!volumeBox)
-         volumeBox = new cWebOSDPageVolumeBox(osd, cRect(0, 0, disp_width, 20));
-      volumeBox->SetVolume(volume, MAXVOLUME, volume ? false : true);
+      int x = 0;          // volumebar x
+      int y = 0;          // volumebar y
+      int w = disp_width; // volumebar width
+      int h = 20;         // volumebar height
+      if (!pixmapVol) {
+          pixmapVol = osd->CreatePixmap(7, cRect(x, y, w, h));
+          pixmapVol->Fill(clrTransparent);
+      }
+      if (volume) {
+         int p = (w - 1) * volume / MAXVOLUME;
+         pixmapVol->DrawRectangle(cRect(0, 0, p - 1, h - 1), clrVolumeBarLower);
+         pixmapVol->DrawRectangle(cRect(p, 0, w - 1, h - 1), clrVolumeBarUpper);
+      } else {
+         pixmap->DrawRectangle(cRect(0, 0, w - 1, h - 1), clrVolumeBarUpper);
+      }
       lastVolume = volume;
-      lastVolumeTime = time(NULL);
       if (osd)
          osd->Flush();
-   } else {
-      // volume has not changed, delete volumebox after some time
-      if (volumeBox && (time(NULL) - lastVolumeTime > 2)) {
-         DELETENULL(volumeBox);
-         if (osd)
-            osd->Flush();
-      }
    }
+}
+
+void WebOSDPage::DeleteVolume(void) {
+    if (pixmapVol) {
+        osd->DestroyPixmap(pixmapVol);
+        pixmapVol = nullptr;
+    }
+    if (osd)
+        osd->Flush();
 }
 
 cOsdObject *WebOSDPage::GetInfo() {

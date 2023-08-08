@@ -5,7 +5,6 @@
 #include <thread>
 #include <vdr/osdbase.h>
 #include <vdr/player.h>
-#include "volumebox.h"
 #include "status.h"
 
 enum OSD_MODE {
@@ -18,16 +17,17 @@ class WebOSDPage : public cControl {
 
 private:
     cPixmap *pixmap;
+    cPixmap *pixmapVol = NULL;
     cOsd* osd;
 
+    tColor clrVolumeBarUpper = clrRed;
+    tColor clrVolumeBarLower = clrGreen;
     int disp_width;
     int disp_height;
     bool useOutputDeviceScale;
     int browser_width;
     int browser_height;
     int lastVolume;
-    time_t lastVolumeTime;
-    cWebOSDPageVolumeBox *volumeBox = NULL;
 
     static std::map<int, std::string> keyMap;
 
@@ -62,7 +62,8 @@ public:
     // Using both methods in parallel leads to undefined behaviour.
     bool drawImage(uint8_t* image, int render_width, int render_height, int x, int y, int width, int height);
     bool drawImageQOI(const std::string& qoibuffer);
-    void DrawVolume(int volume = 0, bool forcedelete = false);
+    void DrawVolume(int volume = 0);
+    void DeleteVolume(void);
 };
 
 extern cHbbtvDeviceStatus *hbbtvDeviceStatus;

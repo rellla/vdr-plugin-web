@@ -111,39 +111,40 @@ void cHbbtvDeviceStatus::ChannelSwitch(const cDevice * vdrDevice, int channelNum
    }
 }
 
-void triggerVolumeThread(int volume) {
-   int counter = 0;
+void triggerVolumeThread(time_t lastVolumeTime) {
    int waitTime = 400;
 
-   // Periodically update the volume bar
+   // wait until display time is reached
    while (runVolumeTrigger) {
-      counter++;
-      if ((4 * 1000) - (counter * waitTime) <= 0) {
+      if (time(NULL) - lastVolumeTime > 3) {
           runVolumeTrigger = false;
        } else {
-         WebOSDPage *page = WebOSDPage::Get();
-         if (page)
-            page->DrawVolume(volume);
          std::this_thread::sleep_for(std::chrono::milliseconds(waitTime));
       }
    }
 
-   // force deleting the volume bar on exit
+   // deleting the volume bar on exit
    WebOSDPage *page = WebOSDPage::Get();
    if (page)
-     page->DrawVolume(volume, true);
+     page->DeleteVolume();
 }
 
 void cHbbtvDeviceStatus::SetVolume(int Volume, bool Absolute) {
     // instead using the parameter (relative volume change), use the absolute volume of the Device
 //    browserClient->SetVolume(cDevice::CurrentVolume(), MAXVOLUME);
+
    // First, stop a running thread if we have one
-   if (volumeTriggerThread) {
+/*   if (volumeTriggerThread) {
       runVolumeTrigger = false;
       volumeTriggerThread->join();
-   }
-   // second, start the new one
+   }*/
+
    volume = Absolute ? Volume : volume + Volume;
+   WebOSDPage* page = WebOSDPage::Get();
+   if (page)
+       page->DrawVolume(volume);
+   lastVolumeTime = time(NULL);
+   // start thread for display time
    runVolumeTrigger = true;
-   volumeTriggerThread = new std::thread(triggerVolumeThread, volume);
+   volumeTriggerThread = new std::thread(triggerVolumeThread, lastVolumeTime);
 }
