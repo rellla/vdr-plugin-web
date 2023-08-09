@@ -6,6 +6,7 @@
  * $Id$
  */
 
+#include <atomic>
 #include <chrono>
 #include <vdr/channels.h>
 #include "status.h"
@@ -62,7 +63,7 @@ inline const char* toChannelJson(const cChannel* channel) {
 }
 
 
-bool runVolumeTrigger = false;
+std::atomic<bool> runVolumeTrigger = false;
 cHbbtvDeviceStatus::cHbbtvDeviceStatus() {
    device = nullptr;
    aitFilter = nullptr;
@@ -73,6 +74,7 @@ cHbbtvDeviceStatus::~cHbbtvDeviceStatus() {
    if (volumeTriggerThread) {
       runVolumeTrigger = false;
       volumeTriggerThread->join();
+      delete volumeTriggerThread;
    }
 }
 
@@ -111,16 +113,16 @@ void cHbbtvDeviceStatus::ChannelSwitch(const cDevice * vdrDevice, int channelNum
    }
 }
 
-void triggerVolumeThread(time_t lastVolumeTime) {
+std::atomic<time_t> lastVolumeTime = time(NULL);
+void triggerVolumeThread() {
    int waitTime = 400;
 
    // wait until display time is reached
    while (runVolumeTrigger) {
-      if (time(NULL) - lastVolumeTime > 3) {
-          runVolumeTrigger = false;
-       } else {
+      if (time(NULL) - lastVolumeTime > 3)
+         runVolumeTrigger = false;
+      else
          std::this_thread::sleep_for(std::chrono::milliseconds(waitTime));
-      }
    }
 
    // deleting the volume bar on exit
@@ -133,18 +135,29 @@ void cHbbtvDeviceStatus::SetVolume(int Volume, bool Absolute) {
     // instead using the parameter (relative volume change), use the absolute volume of the Device
 //    browserClient->SetVolume(cDevice::CurrentVolume(), MAXVOLUME);
 
-   // First, stop a running thread if we have one
-/*   if (volumeTriggerThread) {
-      runVolumeTrigger = false;
-      volumeTriggerThread->join();
-   }*/
-
    volume = Absolute ? Volume : volume + Volume;
    WebOSDPage* page = WebOSDPage::Get();
    if (page)
        page->DrawVolume(volume);
+
+   // (re)set the start display time
    lastVolumeTime = time(NULL);
-   // start thread for display time
-   runVolumeTrigger = true;
-   volumeTriggerThread = new std::thread(triggerVolumeThread, lastVolumeTime);
+
+   // it's the first time we start the thread, nothing more to do
+   if (!volumeTriggerThread) {
+      runVolumeTrigger = true;
+      volumeTriggerThread = new std::thread(triggerVolumeThread);
+      return;
+   }
+
+   // thread was already created, but has finished, so join it and start a new one
+   if (!runVolumeTrigger) {
+      volumeTriggerThread->join();
+      delete volumeTriggerThread;
+      runVolumeTrigger = true;
+      volumeTriggerThread = new std::thread(triggerVolumeThread);
+   }
+
+   // no else, because thread is there and still running, lastVolumeTime was already updated above
+   // if we are here, we just have just reset the lastVolumeTime
 }

@@ -19,7 +19,6 @@ private:
    cAitFilter *aitFilter;
    int sid;
    int volume = 0;
-   time_t lastVolumeTime;
    std::thread* volumeTriggerThread = nullptr;
 protected:
    void ChannelSwitch(const cDevice *device, int channelNumber, bool LiveView) override;
