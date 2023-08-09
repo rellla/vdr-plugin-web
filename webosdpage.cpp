@@ -429,7 +429,7 @@ void WebOSDPage::DrawVolume(int volume) {
          pixmapVol->DrawRectangle(cRect(0, 0, p - 1, h - 1), clrVolumeBarLower);
          pixmapVol->DrawRectangle(cRect(p, 0, w - 1, h - 1), clrVolumeBarUpper);
       } else {
-         pixmap->DrawRectangle(cRect(0, 0, w - 1, h - 1), clrVolumeBarUpper);
+         pixmapVol->DrawRectangle(cRect(0, 0, w - 1, h - 1), clrVolumeBarUpper);
       }
       lastVolume = volume;
       if (osd)
@@ -439,11 +439,11 @@ void WebOSDPage::DrawVolume(int volume) {
 
 void WebOSDPage::DeleteVolume(void) {
     if (pixmapVol) {
+        pixmapVol->SetLayer(-1);
+        osd->Flush();
         osd->DestroyPixmap(pixmapVol);
         pixmapVol = nullptr;
     }
-    if (osd)
-        osd->Flush();
 }
 
 cOsdObject *WebOSDPage::GetInfo() {
